@@ -1,6 +1,89 @@
+# ...existing code...
 import streamlit as st
+import random
+from typing import List, Tuple
 
-st.title("🎈 My new app")
-st.write(
-    "Let's start building! For help and inspiration, head over to [docs.streamlit.io](https://docs.streamlit.io/)."
-)
+st.set_page_config(page_title="곱셈 퀴즈", layout="centered")
+
+def generate_questions(count: int, max_factor: int) -> List[Tuple[int, int, int]]:
+    return [(random.randint(1, max_factor), random.randint(1, max_factor), 0) for _ in range(count)]
+
+def start_quiz(num_q: int, max_factor: int):
+    qs = generate_questions(num_q, max_factor)
+    qs = [(a, b, a*b) for (a, b, _) in qs]
+    st.session_state.questions = qs
+    st.session_state.index = 0
+    st.session_state.score = 0
+    st.session_state.history = []
+    st.session_state.started = True
+    st.session_state.user_answer = None
+
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+st.title("🧮 곱셈 퀴즈")
+st.write("간단한 곱셈 문제로 실력을 확인하세요. 사이드바에서 설정 후 시작하세요.")
+
+# Sidebar: 설정
+with st.sidebar:
+    st.header("설정")
+    num_questions = st.slider("문제 수", min_value=5, max_value=30, value=10, step=1)
+    max_factor = st.selectbox("최대 곱셈 값", options=[5, 9, 12, 19, 99], index=1, format_func=lambda x: f"1~{x}")
+    if st.button("퀴즈 시작"):
+        start_quiz(num_questions, max_factor)
+    if st.button("초기화"):
+        st.session_state.started = False
+        st.session_state.questions = []
+        st.session_state.index = 0
+        st.session_state.score = 0
+        st.session_state.history = []
+        st.session_state.user_answer = None
+        st.success("초기화 완료")
+
+# Main UI
+if not st.session_state.started:
+    st.info("사이드바에서 문제 수와 범위를 정한 뒤 '퀴즈 시작'을 누르세요.")
+else:
+    qs = st.session_state.questions
+    idx = st.session_state.index
+    total = len(qs)
+
+    if idx >= total:
+        st.subheader("퀴즈 완료 🎉")
+        st.write(f"점수: {st.session_state.score} / {total}")
+        if st.session_state.history:
+            st.subheader("상세 결과")
+            for i, entry in enumerate(st.session_state.history, start=1):
+                st.write(f"{i}. {entry}")
+        if st.button("다시 풀기"):
+            start_quiz(total, max_factor)
+    else:
+        a, b, ans = qs[idx]
+        st.metric("진행", f"{idx+1} / {total}")
+        st.subheader(f"문제 {idx+1}")
+        st.write(f"{a} × {b} = ?")
+
+        with st.form(key=f"answer_form_{idx}", clear_on_submit=True):
+            user = st.number_input("정답을 숫자로 입력하세요", min_value=-10**9, max_value=10**9, value=0, step=1)
+            submitted = st.form_submit_button("제출")
+            if submitted:
+                correct = (user == ans)
+                if correct:
+                    st.session_state.score += 1
+                    st.success("정답!")
+                else:
+                    st.error(f"오답. 정답은 {ans} 입니다.")
+                st.session_state.history.insert(0, f"{a}×{b} = {ans} — 입력: {user} — {'정답' if correct else '오답'}")
+                st.session_state.index += 1
+
+        if st.button("정답 보기"):
+            st.info(f"정답: {ans}")
+
+    # 하단에 요약
+    st.write("---")
+    st.write(f"현재 점수: {st.session_state.score} / {total}")
+    if st.session_state.history:
+        st.subheader("최근 기록")
+        for entry in st.session_state.history[:8]:
+            st.write(entry)
+# ...existing code...
